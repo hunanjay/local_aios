@@ -27,3 +27,21 @@ defined('MOODLE_INTERNAL') || die();
 $string['pluginname'] = 'AIOS SSO Integration';
 $string['aios:gettoken'] = 'Generate web service token via SSO';
 $string['privacy:metadata'] = 'The AIOS SSO Integration plugin does not store any personal data.';
+
+// Events.
+$string['eventtokengenerated'] = 'Web service token generated';
+
+// Launch endpoint strings.
+$string['launchapp'] = 'Launch Application';
+$string['launchingapp'] = 'Launching your application...';
+$string['launchingappdescription'] = 'You will be redirected to your application in a moment. If the redirect does not happen automatically, please click the link below.';
+$string['clickheretolaunch'] = 'Click here to launch the application';
+$string['returntomoodle'] = 'Return to Moodle';
+
+// Error messages.
+$string['missingredirectparameter'] = 'Missing redirect parameter. Either urlscheme or redirect URL must be provided.';
+$string['tokengenerationfailed'] = 'Failed to generate web service token: {$a}';
+$string['invalidpassport'] = 'Invalid passport provided. Please try again.';
+$string['expiredpassport'] = 'Passport has expired. Please request a new launch URL.';
+
+
