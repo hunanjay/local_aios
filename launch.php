@@ -38,10 +38,28 @@ $passport = optional_param('passport', '', PARAM_RAW);
 
 // Set up the page.
 $PAGE->set_context(context_system::instance());
-$PAGE->set_url(new moodle_url('/local/aios/launch.php'));
+
+// IMPORTANT: Set the page URL with all parameters to preserve them during login redirect.
+// This ensures that when users are redirected to login, they return here with the same params.
+$pageurl = new moodle_url('/local/aios/launch.php', [
+    'service' => $servicename,
+    'redirect' => $redirecturl,
+]);
+
+// Add optional parameters if present.
+if (!empty($urlscheme)) {
+    $pageurl->param('urlscheme', $urlscheme);
+}
+if (!empty($passport)) {
+    $pageurl->param('passport', $passport);
+}
+
+$PAGE->set_url($pageurl);
 $PAGE->set_pagelayout('base');
 
 // Require user to be logged in.
+// When user is not logged in, Moodle will redirect to login page
+// and then return to $PAGE->url (which includes all our parameters).
 require_login(null, false);
 
 // Check user is not guest.
