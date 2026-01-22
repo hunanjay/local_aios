@@ -1,19 +1,4 @@
 <?php
-// This file is part of Moodle - http://moodle.org/
-//
-// Moodle is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Moodle is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
-
 /**
  * Launch endpoint for AIOS SSO integration.
  * Similar to /admin/tool/mobile/launch.php but for web app SSO.
@@ -24,14 +9,15 @@
  * 3. Redirects to the application with the token
  *
  * @package    local_aios
- * @copyright  2026 Your Organization
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @copyright  2026 hunanjay (https://github.com/hunanjay)
  */
 
 require_once(__DIR__ . '/../../config.php');
 
 // Get URL parameters.
-$servicename = optional_param('service', 'moodle_mobile_app', PARAM_ALPHANUMEXT);
+// Use configured default service if not provided
+$defaultservice = get_config('local_aios', 'default_service') ?: 'moodle_mobile_app';
+$servicename = optional_param('service', $defaultservice, PARAM_ALPHANUMEXT);
 $urlscheme = optional_param('urlscheme', '', PARAM_NOTAGS);
 $redirecturl = optional_param('redirect', '', PARAM_URL);
 $passport = optional_param('passport', '', PARAM_RAW);
@@ -80,6 +66,17 @@ if (empty($CFG->enablewebservices)) {
 // Determine redirect target (either urlscheme or redirect URL).
 if (empty($urlscheme) && empty($redirecturl)) {
     throw new moodle_exception('missingredirectparameter', 'local_aios');
+}
+
+// Check if service is in allowed list (if configured)
+$allowedservices = get_config('local_aios', 'allowed_services');
+if (!empty($allowedservices)) {
+    // Parse comma-separated list and trim whitespace
+    $allowedlist = array_map('trim', explode(',', $allowedservices));
+
+    if (!in_array($servicename, $allowedlist)) {
+        throw new moodle_exception('servicenotallowed', 'local_aios', '', $servicename);
+    }
 }
 
 // Validate the service exists and is enabled.
@@ -172,6 +169,10 @@ if (!empty($urlscheme)) {
     if (!empty($token->privatetoken)) {
         $redirectbase->param('privatetoken', $token->privatetoken);
     }
+    
+    // Add site URL for backend to know which Moodle instance this is.
+    // This is crucial for validating the token against the correct Moodle instance.
+    $redirectbase->param('siteurl', $CFG->wwwroot);
     
     $finalurl = $redirectbase->out(false);
 }

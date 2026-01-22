@@ -1,25 +1,10 @@
 <?php
-// This file is part of Moodle - http://moodle.org/
-//
-// Moodle is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Moodle is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
  * English language strings for local_aios.
  *
  * @package    local_aios
- * @copyright  2026 Your Organization
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @copyright  2026 hunanjay (https://github.com/hunanjay)
  */
 
 defined('MOODLE_INTERNAL') || die();
@@ -27,6 +12,16 @@ defined('MOODLE_INTERNAL') || die();
 $string['pluginname'] = 'AIOS SSO Integration';
 $string['aios:gettoken'] = 'Generate web service token via SSO';
 $string['privacy:metadata'] = 'The AIOS SSO Integration plugin does not store any personal data.';
+
+// Settings.
+$string['defaultservice'] = 'Default web service';
+$string['defaultservice_desc'] = 'Default web service shortname to use when service parameter is not provided in the launch URL. Default: moodle_mobile_app';
+$string['allowedservices'] = 'Allowed web services';
+$string['allowedservices_desc'] = 'Comma-separated list of web service shortnames that are allowed to be used with SSO. Leave empty to allow any enabled service. Example: moodle_mobile_app,local_aios';
+$string['siteidentity'] = 'Site identity';
+$string['siteidentity_desc'] = 'Unique identifier for this Moodle site. Used for passport validation (optional). Leave empty to disable passport validation.';
+$string['passportsecret'] = 'Passport secret';
+$string['passportsecret_desc'] = 'Shared secret for passport validation (optional). Generate a random string for enhanced security.';
 
 // Events.
 $string['eventtokengenerated'] = 'Web service token generated';
@@ -43,5 +38,6 @@ $string['missingredirectparameter'] = 'Missing redirect parameter. Either urlsch
 $string['tokengenerationfailed'] = 'Failed to generate web service token: {$a}';
 $string['invalidpassport'] = 'Invalid passport provided. Please try again.';
 $string['expiredpassport'] = 'Passport has expired. Please request a new launch URL.';
+$string['servicenotallowed'] = 'The requested web service "{$a}" is not allowed for SSO authentication.';
 
 
