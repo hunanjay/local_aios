@@ -162,6 +162,8 @@ if (!empty($urlscheme)) {
     
 } else {
     // HTTP(S) redirect URL for web apps.
+    // 为了避免在 URL 中直接暴露 token，这里不再把 token 拼到查询参数里，
+    // 而是后面通过一个自动提交的 POST 表单把 token 传给后端回调接口。
     $redirectbase = new moodle_url($redirecturl);
     $redirectbase->param('token', $token->token);
     
@@ -174,6 +176,7 @@ if (!empty($urlscheme)) {
     // This is crucial for validating the token against the correct Moodle instance.
     $redirectbase->param('siteurl', $CFG->wwwroot);
     
+    // 注意：$redirecturl 本身已经带有 state 等参数，这里只负责保留这些参数，不再追加 token。
     $finalurl = $redirectbase->out(false);
 }
 
@@ -206,6 +209,51 @@ if (!empty($urlscheme)) {
     echo $OUTPUT->footer();
     
 } else {
-    // Direct HTTP redirect for web apps.
-    redirect($finalurl);
+    // Web 应用场景：使用一个中间页面，通过 POST 表单把 token 传给后端，
+    // 这样 token 不会出现在浏览器地址栏和大多数反向代理的访问日志中。
+
+    $PAGE->set_title(get_string('launchapp', 'local_aios'));
+    $PAGE->set_heading(get_string('launchapp', 'local_aios'));
+
+    echo $OUTPUT->header();
+
+    // 构造自动提交的表单，使用 POST 把 token 等信息传给 $finalurl
+    echo html_writer::start_tag('form', [
+        'id' => 'aios_sso_form',
+        'method' => 'post',
+        'action' => $finalurl
+    ]);
+
+    // Web service token（必需）
+    echo html_writer::empty_tag('input', [
+        'type' => 'hidden',
+        'name' => 'token',
+        'value' => $token->token
+    ]);
+
+    // Private token（可选）
+    if (!empty($token->privatetoken)) {
+        echo html_writer::empty_tag('input', [
+            'type' => 'hidden',
+            'name' => 'privatetoken',
+            'value' => $token->privatetoken
+        ]);
+    }
+
+    // 站点 URL，方便后端识别来源 Moodle 实例
+    echo html_writer::empty_tag('input', [
+        'type' => 'hidden',
+        'name' => 'siteurl',
+        'value' => $CFG->wwwroot
+    ]);
+
+    echo html_writer::end_tag('form');
+
+    // 提示信息 + 自动提交脚本
+    echo html_writer::tag('p', get_string('launchingappdescription', 'local_aios'));
+    echo html_writer::script("
+        document.getElementById('aios_sso_form').submit();
+    ");
+
+    echo $OUTPUT->footer();
 }
