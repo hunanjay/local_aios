@@ -1,34 +1,28 @@
 <?php
-// This file is part of Moodle - http://moodle.org/
-//
-// Moodle is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// Moodle is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
  * Launch endpoint for AIOS SSO integration.
  * Similar to /admin/tool/mobile/launch.php but for web app SSO.
  *
- * This endpoint handles browser-based SSO flow:
+ * This endpoint handles browser-based SSO flow using OAuth2-style authorization code:
  * 1. Validates user is authenticated
  * 2. Generates a web service token
- * 3. Redirects to the application with the token
+ * 3. Creates a temporary authorization code (5-minute expiry)
+ * 4. Redirects to the application with the code (not the token)
+ * 5. Application exchanges code for token via /local/aios/exchange.php
+ *
+ * Security benefits:
+ * - Token never exposed to browser
+ * - Code is single-use and short-lived
+ * - Code exchange requires server-to-server call
  *
  * @package    local_aios
- * @copyright  2026 Your Organization
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @copyright  https://github.com/hunanjay
  */
 
 require_once(__DIR__ . '/../../config.php');
+require_once(__DIR__ . '/classes/code_store.php');
+require_once(__DIR__ . '/lib.php');
 
 // Get URL parameters.
 $servicename = optional_param('service', 'moodle_mobile_app', PARAM_ALPHANUMEXT);
@@ -131,13 +125,32 @@ $context = context_system::instance();
 require_capability('local/aios:gettoken', $context);
 
 try {
-    // Generate or retrieve existing token for current user.
-    // This uses Moodle's core API which handles token generation securely.
-    $token = \core_external\util::generate_token_for_current_user($service);
-    
+    // Reset token on each launch (deletes old token and generates new one).
+    // This ensures users always have a fresh token with current settings.
+    $token = local_aios_reset_token($USER->id, $servicename);
+
+    // Validate token object.
+    if (empty($token) || !is_object($token)) {
+        throw new moodle_exception('tokengenerationfailed', 'local_aios', '',
+            'Token reset returned invalid object');
+    }
+
+    if (empty($token->id)) {
+        throw new moodle_exception('tokengenerationfailed', 'local_aios', '',
+            'Token object missing id field. Object type: ' . gettype($token));
+    }
+
     // Log the token request event.
     \core_external\util::log_token_request($token);
-    
+
+    // Generate a temporary authorization code (OAuth2-style).
+    // Code is valid for 5 minutes and can only be used once.
+    $code = \local_aios\code_store::generate_code(
+        $USER->id,
+        $servicename,
+        $token->id
+    );
+
     // Trigger custom event for tracking.
     $event = \local_aios\event\token_generated::create([
         'context' => $context,
@@ -148,30 +161,35 @@ try {
         ],
     ]);
     $event->trigger();
-    
+
 } catch (Exception $e) {
-    throw new moodle_exception('tokengenerationfailed', 'local_aios', '', $e->getMessage());
+    // Add debug information if debugging is enabled.
+    $debuginfo = debugging() ? ' Debug: ' . $e->getTraceAsString() : '';
+    throw new moodle_exception('tokengenerationfailed', 'local_aios', '', $e->getMessage() . $debuginfo);
 }
 
-// Build redirect URL with token.
+// Build redirect URL with authorization code.
+// Note: We now use authorization code instead of direct token.
+// The code is short-lived (5 min) and single-use, so it's safe to pass via URL.
 if (!empty($urlscheme)) {
     // Custom URL scheme for mobile/desktop apps (e.g., myapp://launch).
     $separator = (strpos($urlscheme, '?') !== false) ? '&' : '?';
-    $finalurl = $urlscheme . $separator . 'token=' . urlencode($token->token) . 
-                '&privatetoken=' . urlencode($token->privatetoken ?? '');
+    $finalurl = $urlscheme . $separator . 'code=' . urlencode($code);
     
     // Add site URL for app to know which Moodle instance this is.
     $finalurl .= '&siteurl=' . urlencode($CFG->wwwroot);
     
 } else {
     // HTTP(S) redirect URL for web apps.
-    // 为了避免在 URL 中直接暴露 token，这里不再把 token 拼到查询参数里，
-    // 而是后面通过一个自动提交的 POST 表单把 token 传给后端回调接口。
+    // Pass authorization code via URL parameter.
+    // The code is single-use and expires in 5 minutes, so it's safe.
     $redirectbase = new moodle_url($redirecturl);
-    // 注意：$redirecturl 本身已经带有 state 等参数，这里只负责保留这些参数，不再追加 token。
+    $redirectbase->param('code', $code);
+    $redirectbase->param('siteurl', $CFG->wwwroot);
     $finalurl = $redirectbase->out(false);
 }
 
+// Redirect to the application with authorization code.
 // For custom URL schemes, we need to show an intermediate page
 // because direct redirect to custom schemes doesn't always work.
 if (!empty($urlscheme)) {
@@ -201,51 +219,9 @@ if (!empty($urlscheme)) {
     echo $OUTPUT->footer();
     
 } else {
-    // Web 应用场景：使用一个中间页面，通过 POST 表单把 token 传给后端，
-    // 这样 token 不会出现在浏览器地址栏和大多数反向代理的访问日志中。
-
-    $PAGE->set_title(get_string('launchapp', 'local_aios'));
-    $PAGE->set_heading(get_string('launchapp', 'local_aios'));
-
-    echo $OUTPUT->header();
-
-    // 构造自动提交的表单，使用 POST 把 token 等信息传给 $finalurl
-    echo html_writer::start_tag('form', [
-        'id' => 'aios_sso_form',
-        'method' => 'post',
-        'action' => $finalurl
-    ]);
-
-    // Web service token（必需）
-    echo html_writer::empty_tag('input', [
-        'type' => 'hidden',
-        'name' => 'token',
-        'value' => $token->token
-    ]);
-
-    // Private token（可选）
-    if (!empty($token->privatetoken)) {
-        echo html_writer::empty_tag('input', [
-            'type' => 'hidden',
-            'name' => 'privatetoken',
-            'value' => $token->privatetoken
-        ]);
-    }
-
-    // 站点 URL，方便后端识别来源 Moodle 实例
-    echo html_writer::empty_tag('input', [
-        'type' => 'hidden',
-        'name' => 'siteurl',
-        'value' => $CFG->wwwroot
-    ]);
-
-    echo html_writer::end_tag('form');
-
-    // 提示信息 + 自动提交脚本
-    echo html_writer::tag('p', get_string('launchingappdescription', 'local_aios'));
-    echo html_writer::script("
-        document.getElementById('aios_sso_form').submit();
-    ");
-
-    echo $OUTPUT->footer();
+    // Web 应用场景：直接重定向，携带授权码（authorization code）。
+    // 授权码是一次性的且 5 分钟过期，因此可以安全地通过 URL 传递。
+    // 应用后端需要调用 /local/aios/exchange.php 用 code 换取真正的 token。
+    
+    redirect($finalurl);
 }
