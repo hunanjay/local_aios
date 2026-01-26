@@ -25,7 +25,10 @@ require_once(__DIR__ . '/classes/code_store.php');
 require_once(__DIR__ . '/lib.php');
 
 // Get URL parameters.
-$servicename = optional_param('service', 'moodle_mobile_app', PARAM_ALPHANUMEXT);
+// IMPORTANT: Always use the configured service shortname from plugin settings.
+// We do NOT allow URL parameters to override this for security reasons.
+// This ensures admin-configured service is always used.
+$servicename = get_config('local_aios', 'service_shortname') ?: 'moodle_mobile_app';
 $urlscheme = optional_param('urlscheme', '', PARAM_NOTAGS);
 $redirecturl = optional_param('redirect', '', PARAM_URL);
 $passport = optional_param('passport', '', PARAM_RAW);

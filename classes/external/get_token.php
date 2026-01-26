@@ -33,7 +33,7 @@ class get_token extends external_api {
      */
     public static function execute_parameters() {
         return new external_function_parameters([
-            'servicename' => new external_value(PARAM_ALPHANUMEXT, 'Service name', VALUE_DEFAULT, 'moodle_mobile_app'),
+            'servicename' => new external_value(PARAM_ALPHANUMEXT, 'Service name', VALUE_DEFAULT, ''),
         ]);
     }
 
@@ -44,7 +44,7 @@ class get_token extends external_api {
      * @return array Token and related information
      * @throws moodle_exception
      */
-    public static function execute($servicename = 'moodle_mobile_app') {
+    public static function execute($servicename = '') {
         global $CFG, $USER, $DB;
 
         // Validate parameters.
@@ -52,6 +52,11 @@ class get_token extends external_api {
             'servicename' => $servicename,
         ]);
         $servicename = $params['servicename'];
+
+        // Use configured service shortname if not provided.
+        if (empty($servicename)) {
+            $servicename = get_config('local_aios', 'service_shortname') ?: 'moodle_mobile_app';
+        }
 
         // Check user is logged in.
         if (!isloggedin()) {
