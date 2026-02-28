@@ -39,4 +39,12 @@ if ($hassiteconfig) {
         'moodle_mobile_app',  // Default service shortname
         PARAM_ALPHANUMEXT
     ));
+
+    $settings->add(new admin_setting_configtextarea(
+        'local_aios/allowed_redirects',
+        get_string('allowedredirects', 'local_aios'),
+        get_string('allowedredirects_desc', 'local_aios'),
+        '',
+        PARAM_RAW
+    ));
 }
