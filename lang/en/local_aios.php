@@ -20,6 +20,9 @@ $string['token_ttl'] = 'Token TTL (seconds)';
 $string['token_ttl_desc'] = 'Token validity period in seconds, e.g., 86400 for 24 hours. Set to 0 for permanent tokens.';
 $string['service_shortname'] = 'Service Shortname';
 $string['service_shortname_desc'] = 'Web Service shortname to use for token generation, e.g., moodle_mobile_app or local_aios.';
+$string['allowedredirects'] = 'Allowed redirect URLs';
+$string['allowedredirects_desc'] = 'Enter one allowed redirect URL or domain per line. Only these destinations will be permitted during SSO launch. Example: https://myapp.example.com';
+$string['redirectnotallowed'] = 'The redirect URL is not in the allowed list.';
 
 // Events.
 $string['eventtokengenerated'] = 'Web service token generated';

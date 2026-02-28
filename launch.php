@@ -79,6 +79,42 @@ if (empty($urlscheme) && empty($redirecturl)) {
     throw new moodle_exception('missingredirectparameter', 'local_aios');
 }
 
+if (!empty($redirecturl)) {
+    $allowedredirects = get_config('local_aios', 'allowed_redirects');
+
+    // If no whitelist is configured, reject ALL redirects as a safe default.
+    if (empty($allowedredirects)) {
+        throw new moodle_exception('redirectnotallowed', 'local_aios');
+    }
+
+    $allowed = false;
+    $redirecthost = parse_url($redirecturl, PHP_URL_HOST);
+
+    if (!empty($redirecthost)) {
+        $allowedlist = array_map('trim', explode("\n", $allowedredirects));
+        foreach ($allowedlist as $allowedurl) {
+            $allowedurl = trim($allowedurl);
+            if (empty($allowedurl)) {
+                continue;
+            }
+            // Support both full URLs and bare domains.
+            $allowedhost = parse_url($allowedurl, PHP_URL_HOST);
+            if (empty($allowedhost)) {
+                // Treat as bare domain (e.g., "myapp.example.com").
+                $allowedhost = $allowedurl;
+            }
+            if (strcasecmp($redirecthost, $allowedhost) === 0) {
+                $allowed = true;
+                break;
+            }
+        }
+    }
+
+    if (!$allowed) {
+        throw new moodle_exception('redirectnotallowed', 'local_aios');
+    }
+}
+
 // Validate the service exists and is enabled.
 $service = $DB->get_record('external_services', ['shortname' => $servicename, 'enabled' => 1]);
 if (empty($service)) {
